@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { api } from '../../lib/api'
 import type { Match } from '../../lib/types'
 import { getFollows } from './api'
+import { useTeamNames } from '../../lib/useTeamNames'
 
 function dayKey(iso: string): string {
   if (!iso) return 'TBD'
@@ -11,6 +12,7 @@ function dayKey(iso: string): string {
 export default function SchedulePage() {
   const { data: matches = [] } = useQuery({ queryKey: ['fixtures'], queryFn: api.fixtures })
   useQuery({ queryKey: ['follows'], queryFn: getFollows })
+  const name = useTeamNames()
   const byDay = new Map<string, Match[]>()
   for (const m of matches) {
     const k = dayKey(m.kickoffUtc)
@@ -26,7 +28,7 @@ export default function SchedulePage() {
           <ul>
             {byDay.get(d)!.map((m) => (
               <li key={m.id} className="sched__row">
-                <span>{m.group || m.stage}</span> <span>#{m.homeId} v #{m.awayId}</span>
+                <span>{m.group || m.stage}</span> <span>{name(m.homeId)} v {name(m.awayId)}</span>
               </li>
             ))}
           </ul>
