@@ -1,0 +1,121 @@
+:root {
+  --bg: #0a0e0d;
+  --panel: #111715;
+  --line: #1e2825;
+  --pitch: #00d26a;
+  --text: #e8efe9;
+  --muted: #6f827a;
+  --font-display: "Arial Narrow", "Roboto Condensed", system-ui, sans-serif;
+  --font-body: system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-body);
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+}
+
+.shell {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.shell__bar {
+  display: flex;
+  align-items: baseline;
+  gap: 0.75rem;
+  padding: 1rem 1.5rem;
+  border-bottom: 1px solid var(--line);
+  background: var(--panel);
+}
+
+.shell__mark {
+  color: var(--pitch);
+  font-size: 1.1rem;
+}
+
+.shell__title {
+  font-family: var(--font-display);
+  letter-spacing: 0.15em;
+  font-size: 1.25rem;
+  font-weight: 700;
+}
+
+.shell__tag {
+  color: var(--muted);
+  font-size: 0.7rem;
+  letter-spacing: 0.2em;
+}
+
+.shell__body {
+  flex: 1;
+  display: grid;
+  place-items: center;
+}
+
+.shell__note {
+  color: var(--muted);
+  letter-spacing: 0.05em;
+}
+
+/* ── Nav ── */
+.shell__nav { display: flex; gap: 0.25rem; margin-left: auto; }
+.shell__nav button {
+  background: transparent; color: var(--muted); border: 0; padding: 0.4rem 0.7rem;
+  font: inherit; letter-spacing: 0.05em; cursor: pointer; border-radius: 4px;
+  transition: color 0.15s ease, background 0.15s ease;
+}
+.shell__nav button:hover { color: var(--text); }
+.shell__nav button.is-active { color: var(--text); background: rgba(0,210,106,0.12); }
+
+/* ── Live dot ── */
+.shell__live { margin-left: 0.75rem; color: var(--muted); font-size: 0.7rem; }
+.shell__live.is-on { color: var(--pitch); animation: pulse 1.6s ease-in-out infinite; }
+@keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.35; } }
+
+/* ── Source chip ── */
+.shell__source {
+  margin-left: 0.5rem; font-size: 0.6rem; letter-spacing: 0.15em; color: var(--bg);
+  background: var(--muted); padding: 0.1rem 0.4rem; border-radius: 3px;
+}
+
+/* ── Page body ── */
+.shell__body--page { display: block; padding: 1.5rem; overflow-y: auto; }
+
+/* ── Utility ── */
+.muted { color: var(--muted); }
+
+/* ── Match Center ── */
+.mc__h { font-family: var(--font-display); letter-spacing: 0.1em; font-size: 0.9rem; color: var(--muted); margin: 1rem 0 0.5rem; text-transform: uppercase; }
+.mc__list { list-style: none; display: grid; gap: 0.5rem; }
+.mc__row { display: grid; grid-template-columns: 1fr auto auto; gap: 1rem; align-items: center; padding: 0.75rem 1rem; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; }
+.mc__row.is-live { border-color: rgba(0,210,106,0.4); }
+.mc__score { font-family: var(--font-display); font-size: 1.4rem; font-variant-numeric: tabular-nums; transition: color 0.3s ease; }
+.mc__min { color: var(--pitch); font-size: 0.8rem; font-variant-numeric: tabular-nums; }
+.mc__teams { font-size: 0.95rem; }
+.mc__time { color: var(--muted); font-size: 0.8rem; }
+
+/* ── Schedule ── */
+.sched__day { font-family: var(--font-display); color: var(--muted); letter-spacing: 0.1em; margin: 1.25rem 0 0.5rem; text-transform: uppercase; }
+.sched__row { display: flex; gap: 1rem; padding: 0.4rem 0; border-bottom: 1px solid var(--line); }
+
+/* ── Standings ── */
+.standings table { width: 100%; border-collapse: collapse; margin-bottom: 1.5rem; }
+.standings th, .standings td { text-align: right; padding: 0.4rem 0.6rem; border-bottom: 1px solid var(--line); font-variant-numeric: tabular-nums; font-size: 0.9rem; }
+.standings th:first-child, .standings td:first-child { text-align: left; }
+.standings h3 { font-family: var(--font-display); letter-spacing: 0.1em; margin-bottom: 0.5rem; color: var(--muted); text-transform: uppercase; }
+
+/* ── Explore ── */
+.explore section { margin-bottom: 1.5rem; }
+.explore section h3 { font-family: var(--font-display); letter-spacing: 0.1em; color: var(--muted); text-transform: uppercase; margin-bottom: 0.5rem; }
+.explore ul { list-style: none; display: grid; gap: 0.25rem; }
+.explore li { padding: 0.35rem 0; border-bottom: 1px solid var(--line); font-size: 0.9rem; }
