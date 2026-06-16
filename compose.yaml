@@ -9,7 +9,7 @@ services:
     environment:
       - PORT=8080
       - DB_PATH=/data/touchline.db
-      - LIVE_SOURCE=${LIVE_SOURCE:-real}
+      - LIVE_SOURCE=${LIVE_SOURCE:-sim}
       - API_FOOTBALL_KEY=${API_FOOTBALL_KEY}
       - DAILY_REQUEST_BUDGET=${DAILY_REQUEST_BUDGET:-80}
     volumes:
