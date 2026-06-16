@@ -76,13 +76,37 @@ func main() {
 			realProvider := provider.NewAPIFootball(key)
 			log.Printf("LIVE_SOURCE=real: APIFootball provider active, budget %d req/day (remaining: %d)",
 				dailyLimit, b.Remaining())
-			// reference-data refresh under budget (runs once at boot):
+			ctx := context.Background()
+			// Teams
 			if b.Allow() {
-				if teams, err := realProvider.Teams(context.Background()); err == nil {
+				if teams, err := realProvider.Teams(ctx); err == nil {
 					_ = st.UpsertTeams(teams)
 					log.Printf("refreshed %d teams from APIFootball", len(teams))
 				} else {
 					log.Printf("team refresh failed (snapshot remains): %v", err)
+				}
+			}
+			// Fixtures
+			if b.Allow() {
+				if fixtures, err := realProvider.Fixtures(ctx); err == nil {
+					_ = st.UpsertMatches(fixtures)
+					log.Printf("refreshed %d fixtures from APIFootball", len(fixtures))
+					// Reload hot store with real fixture data
+					if m, err := st.Matches(); err == nil {
+						hotStore.Hydrate(m, nil)
+					}
+				} else {
+					log.Printf("fixture refresh failed (snapshot remains): %v", err)
+				}
+			}
+			// Standings
+			if b.Allow() {
+				if sd, err := realProvider.Standings(ctx); err == nil {
+					_ = st.UpsertStandings(sd)
+					hotStore.SetStandings(sd)
+					log.Printf("refreshed standings from APIFootball")
+				} else {
+					log.Printf("standings refresh failed: %v", err)
 				}
 			}
 		}

@@ -25,20 +25,24 @@ export default function Shell() {
   return (
     <main className="shell">
       <header className="shell__bar">
-        <span className="shell__mark" aria-hidden="true">▲</span>
-        <h1 className="shell__title">TOUCHLINE</h1>
-        <span className="shell__tag">WORLD CUP 2026</span>
+        <span className="shell__logo">
+          <span className="shell__mark">▲</span>
+          <h1 className="shell__title">TOUCHLINE</h1>
+        </span>
+        <span className="shell__tag">FIFA WORLD CUP 2026</span>
         <nav className="shell__nav">
           {VIEWS.map((v) => (
             <button key={v} className={v === view ? 'is-active' : ''} onClick={() => setView(v)}>{v}</button>
           ))}
         </nav>
-        <span className={`shell__live ${connected ? 'is-on' : ''}`} title={connected ? 'live' : 'offline'}>●</span>
-        {meta?.source && <span className="shell__source">{meta.source.toUpperCase()}</span>}
+        <span className="shell__status">
+          <span className={`shell__live ${connected ? 'is-on' : ''}`}>●</span>
+          {meta?.source && <span className="shell__source">{meta.source}</span>}
+        </span>
       </header>
-      <section className="shell__body shell__body--page">
+      <div className="shell__body">
         <Page />
-      </section>
+      </div>
     </main>
   )
 }

@@ -11,14 +11,16 @@ function wrap(qc: QueryClient) {
 test('lists live matches with score', () => {
   const qc = new QueryClient()
   qc.setQueryData(['teams'], [
-    { id: 1, name: 'Brazil', country: '', group: '', crestUrl: '' },
-    { id: 2, name: 'Spain', country: '', group: '', crestUrl: '' },
+    { id: 1, name: 'Brazil', country: 'Brazil', group: 'F', crestUrl: '' },
+    { id: 2, name: 'Spain', country: 'Spain', group: 'F', crestUrl: '' },
   ])
   qc.setQueryData<Match[]>(['fixtures'], [
     { id: 1, stage: 'group', group: 'F', venueId: 0, homeId: 1, awayId: 2, kickoffUtc: '2026-06-11T19:00:00Z', status: 'live', minute: 30, homeScore: 2, awayScore: 1 },
   ])
   render(<MatchCenterPage />, { wrapper: wrap(qc) })
-  expect(screen.getByText(/2\s*[-–]\s*1/)).toBeInTheDocument()
-  expect(screen.getByText(/30'/)).toBeInTheDocument()
-  expect(screen.getByText(/Brazil/)).toBeInTheDocument()
+  // scores are in separate elements (2 and 1 in separate spans)
+  expect(screen.getByText('2')).toBeInTheDocument()
+  expect(screen.getByText('1')).toBeInTheDocument()
+  expect(screen.getByText("30'")).toBeInTheDocument()
+  expect(screen.getByText('Brazil')).toBeInTheDocument()
 })
