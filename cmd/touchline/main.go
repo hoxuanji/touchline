@@ -70,43 +70,59 @@ func main() {
 		} else {
 			dailyLimit, _ := strconv.Atoi(os.Getenv("DAILY_REQUEST_BUDGET"))
 			if dailyLimit <= 0 {
-				dailyLimit = 50
+				dailyLimit = 80
 			}
 			b := budget.New(dailyLimit, time.Now)
 			realProvider := provider.NewAPIFootball(key)
-			log.Printf("LIVE_SOURCE=real: APIFootball provider active, budget %d req/day (remaining: %d)",
-				dailyLimit, b.Remaining())
+			log.Printf("LIVE_SOURCE=real: APIFootball active (budget %d/day, remaining %d)", dailyLimit, b.Remaining())
+
 			ctx := context.Background()
-			// Teams
-			if b.Allow() {
-				if teams, err := realProvider.Teams(ctx); err == nil {
-					_ = st.UpsertTeams(teams)
-					log.Printf("refreshed %d teams from APIFootball", len(teams))
-				} else {
-					log.Printf("team refresh failed (snapshot remains): %v", err)
-				}
-			}
-			// Fixtures
-			if b.Allow() {
-				if fixtures, err := realProvider.Fixtures(ctx); err == nil {
-					_ = st.UpsertMatches(fixtures)
-					log.Printf("refreshed %d fixtures from APIFootball", len(fixtures))
-					// Reload hot store with real fixture data
-					if m, err := st.Matches(); err == nil {
-						hotStore.Hydrate(m, nil)
+
+			// First check API connectivity & quota
+			if status, err := realProvider.Status(ctx); err != nil {
+				log.Printf("API status check FAILED: %v — serving snapshot data", err)
+			} else {
+				log.Printf("API status OK: %v", status["response"])
+
+				// Teams
+				if b.Allow() {
+					if teams, err := realProvider.Teams(ctx); err != nil {
+						log.Printf("team refresh FAILED: %v", err)
+					} else if len(teams) > 0 {
+						_ = st.UpsertTeams(teams)
+						log.Printf("refreshed %d teams from API", len(teams))
+					} else {
+						log.Print("API returned 0 teams (domain not whitelisted or no data for this league/season)")
 					}
-				} else {
-					log.Printf("fixture refresh failed (snapshot remains): %v", err)
 				}
-			}
-			// Standings
-			if b.Allow() {
-				if sd, err := realProvider.Standings(ctx); err == nil {
-					_ = st.UpsertStandings(sd)
-					hotStore.SetStandings(sd)
-					log.Printf("refreshed standings from APIFootball")
-				} else {
-					log.Printf("standings refresh failed: %v", err)
+
+				// Fixtures
+				if b.Allow() {
+					if fixtures, err := realProvider.Fixtures(ctx); err != nil {
+						log.Printf("fixture refresh FAILED: %v", err)
+					} else if len(fixtures) > 0 {
+						_ = st.UpsertMatches(fixtures)
+						log.Printf("refreshed %d fixtures from API", len(fixtures))
+						if m, err := st.Matches(); err == nil {
+							sd, _ := st.Standings()
+							hotStore.Hydrate(m, sd)
+						}
+					} else {
+						log.Print("API returned 0 fixtures (domain not whitelisted or no data for this league/season)")
+					}
+				}
+
+				// Standings
+				if b.Allow() {
+					if sd, err := realProvider.Standings(ctx); err != nil {
+						log.Printf("standings refresh FAILED: %v", err)
+					} else if len(sd) > 0 {
+						_ = st.UpsertStandings(sd)
+						hotStore.SetStandings(sd)
+						log.Printf("refreshed %d standing rows from API", len(sd))
+					} else {
+						log.Print("API returned 0 standings rows")
+					}
 				}
 			}
 		}

@@ -22,8 +22,15 @@ func NewAPIFootball(key string) *APIFootball {
 	return &APIFootball{
 		key:    key,
 		base:   "https://v3.football.api-sports.io",
-		client: &http.Client{Timeout: 10 * time.Second},
+		client: &http.Client{Timeout: 15 * time.Second},
 	}
+}
+
+// apiResponse is the common API-Football envelope.
+type apiResponse struct {
+	Errors  interface{}     `json:"errors"`
+	Results int             `json:"results"`
+	Raw     json.RawMessage `json:"response"`
 }
 
 func (a *APIFootball) get(ctx context.Context, path string) ([]byte, error) {
@@ -32,21 +39,59 @@ func (a *APIFootball) get(ctx context.Context, path string) ([]byte, error) {
 		return nil, err
 	}
 	req.Header.Set("x-apisports-key", a.key)
+	req.Header.Set("x-rapidapi-host", "v3.football.api-sports.io")
+
 	resp, err := a.client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("network: %w", err)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("apifootball %s: status %d", path, resp.StatusCode)
+		return nil, fmt.Errorf("apifootball %s: HTTP %d: %s", path, resp.StatusCode, string(body))
 	}
-	return io.ReadAll(resp.Body)
+
+	// Check for API-level errors (returned as HTTP 200 with error body)
+	var env apiResponse
+	if err := json.Unmarshal(body, &env); err == nil {
+		// errors is {} (empty object) or [] (empty array) when no errors
+		switch e := env.Errors.(type) {
+		case map[string]interface{}:
+			if len(e) > 0 {
+				// Extract first error message
+				for k, v := range e {
+					return nil, fmt.Errorf("apifootball %s: %s: %v", path, k, v)
+				}
+			}
+		}
+		if env.Results == 0 && path != "/status" {
+			// Could be a valid empty response or a domain block
+		}
+	}
+
+	return body, nil
+}
+
+// Status calls /status and returns the raw response for diagnostics.
+func (a *APIFootball) Status(ctx context.Context) (map[string]interface{}, error) {
+	b, err := a.get(ctx, "/status")
+	if err != nil {
+		return nil, err
+	}
+	var result map[string]interface{}
+	err = json.Unmarshal(b, &result)
+	return result, err
 }
 
 // ── Teams ──
 
 func parseTeams(b []byte) ([]model.Team, error) {
-	var doc struct {
+	var env struct {
 		Response []struct {
 			Team struct {
 				ID      int    `json:"id"`
@@ -56,11 +101,11 @@ func parseTeams(b []byte) ([]model.Team, error) {
 			} `json:"team"`
 		} `json:"response"`
 	}
-	if err := json.Unmarshal(b, &doc); err != nil {
+	if err := json.Unmarshal(b, &env); err != nil {
 		return nil, err
 	}
-	out := make([]model.Team, 0, len(doc.Response))
-	for _, r := range doc.Response {
+	out := make([]model.Team, 0, len(env.Response))
+	for _, r := range env.Response {
 		out = append(out, model.Team{
 			ID:       r.Team.ID,
 			Name:     r.Team.Name,
@@ -82,18 +127,22 @@ func (a *APIFootball) Teams(ctx context.Context) ([]model.Team, error) {
 // ── Fixtures ──
 
 func parseFixtures(b []byte) ([]model.Match, error) {
-	var doc struct {
+	var env struct {
 		Response []struct {
 			Fixture struct {
-				ID     int    `json:"id"`
+				ID     int `json:"id"`
 				Status struct {
-					Short  string `json:"short"`
-					Elapsed *int  `json:"elapsed"`
+					Short   string `json:"short"`
+					Elapsed *int   `json:"elapsed"`
 				} `json:"status"`
 				Date string `json:"date"`
+				Venue struct {
+					ID *int `json:"id"`
+				} `json:"venue"`
 			} `json:"fixture"`
 			League struct {
 				Round string `json:"round"`
+				Group string `json:"group"`
 			} `json:"league"`
 			Teams struct {
 				Home struct{ ID int `json:"id"` } `json:"home"`
@@ -103,28 +152,22 @@ func parseFixtures(b []byte) ([]model.Match, error) {
 				Home *int `json:"home"`
 				Away *int `json:"away"`
 			} `json:"goals"`
-			Score struct {
-				Halftime struct {
-					Home *int `json:"home"`
-					Away *int `json:"away"`
-				} `json:"halftime"`
-			} `json:"score"`
 		} `json:"response"`
 	}
-	if err := json.Unmarshal(b, &doc); err != nil {
+	if err := json.Unmarshal(b, &env); err != nil {
 		return nil, err
 	}
 
 	statusMap := map[string]string{
 		"NS": "scheduled", "TBD": "scheduled",
 		"1H": "live", "2H": "live", "ET": "live", "P": "live", "LIVE": "live",
-		"HT": "ht",
-		"FT": "finished", "AET": "finished", "PEN": "finished",
+		"HT":  "ht",
+		"FT":  "finished", "AET": "finished", "PEN": "finished",
 		"PST": "scheduled", "CANC": "scheduled", "ABD": "scheduled",
 	}
 
-	out := make([]model.Match, 0, len(doc.Response))
-	for _, r := range doc.Response {
+	out := make([]model.Match, 0, len(env.Response))
+	for _, r := range env.Response {
 		kickoff, _ := time.Parse(time.RFC3339, r.Fixture.Date)
 		status := statusMap[r.Fixture.Status.Short]
 		if status == "" {
@@ -141,10 +184,34 @@ func parseFixtures(b []byte) ([]model.Match, error) {
 		if r.Goals.Away != nil {
 			awayScore = *r.Goals.Away
 		}
+		venueID := 0
+		if r.Fixture.Venue.ID != nil {
+			venueID = *r.Fixture.Venue.ID
+		}
+
+		// Derive stage from round string
+		stage := "group"
+		round := r.League.Round
+		switch {
+		case contains(round, "Final") && contains(round, "3rd"):
+			stage = "third"
+		case contains(round, "Final") && !contains(round, "Semi") && !contains(round, "Quarter"):
+			stage = "final"
+		case contains(round, "Semi"):
+			stage = "sf"
+		case contains(round, "Quarter"):
+			stage = "qf"
+		case contains(round, "16"):
+			stage = "r16"
+		case contains(round, "32"):
+			stage = "r32"
+		}
+
 		out = append(out, model.Match{
 			ID:         r.Fixture.ID,
-			Stage:      "group", // simplified; round parsing can be added
-			Group:      "",
+			Stage:      stage,
+			Group:      r.League.Group,
+			VenueID:    venueID,
 			HomeID:     r.Teams.Home.ID,
 			AwayID:     r.Teams.Away.ID,
 			KickoffUTC: kickoff,
@@ -155,6 +222,18 @@ func parseFixtures(b []byte) ([]model.Match, error) {
 		})
 	}
 	return out, nil
+}
+
+func contains(s, sub string) bool {
+	return len(s) >= len(sub) && (s == sub || len(sub) == 0 ||
+		func() bool {
+			for i := 0; i <= len(s)-len(sub); i++ {
+				if s[i:i+len(sub)] == sub {
+					return true
+				}
+			}
+			return false
+		}())
 }
 
 func (a *APIFootball) Fixtures(ctx context.Context) ([]model.Match, error) {
@@ -168,15 +247,13 @@ func (a *APIFootball) Fixtures(ctx context.Context) ([]model.Match, error) {
 // ── Standings ──
 
 func parseStandings(b []byte) ([]model.Standing, error) {
-	var doc struct {
+	var env struct {
 		Response []struct {
 			League struct {
 				Standings [][]struct {
-					Rank int    `json:"rank"`
 					Team struct{ ID int `json:"id"` } `json:"team"`
-					Points int `json:"points"`
-					GoalsDiff int `json:"goalsDiff"`
-					Group string `json:"group"`
+					Points    int    `json:"points"`
+					Group     string `json:"group"`
 					All struct {
 						Played int `json:"played"`
 						Win    int `json:"win"`
@@ -192,11 +269,11 @@ func parseStandings(b []byte) ([]model.Standing, error) {
 			} `json:"league"`
 		} `json:"response"`
 	}
-	if err := json.Unmarshal(b, &doc); err != nil {
+	if err := json.Unmarshal(b, &env); err != nil {
 		return nil, err
 	}
 	var out []model.Standing
-	for _, resp := range doc.Response {
+	for _, resp := range env.Response {
 		for _, group := range resp.League.Standings {
 			for _, row := range group {
 				out = append(out, model.Standing{
@@ -225,11 +302,7 @@ func (a *APIFootball) Standings(ctx context.Context) ([]model.Standing, error) {
 	return parseStandings(b)
 }
 
-// ── Venues ──
-
 func (a *APIFootball) Venues(ctx context.Context) ([]model.Venue, error) {
-	// Venues are structural WC2026 data not available per-league on free tier;
-	// the bundled snapshot is authoritative.
 	return nil, fmt.Errorf("apifootball venues: use snapshot")
 }
 

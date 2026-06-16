@@ -2,10 +2,13 @@
 package server
 
 import (
+	"encoding/json"
 	"net/http"
+	"os"
 
 	"touchline/internal/api"
 	"touchline/internal/hot"
+	"touchline/internal/provider"
 	"touchline/internal/sse"
 	"touchline/internal/store"
 	"touchline/web"
@@ -19,8 +22,7 @@ type Deps struct {
 	Source string // "sim" | "real"
 }
 
-// Handler builds the application's HTTP handler: health, REST API, SSE stream,
-// and the embedded SPA.
+// Handler builds the application's HTTP handler.
 func Handler(deps Deps) (http.Handler, error) {
 	mux := http.NewServeMux()
 
@@ -36,6 +38,25 @@ func Handler(deps Deps) (http.Handler, error) {
 	mux.HandleFunc("GET /api/meta", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`{"source":"` + source + `"}`))
+	})
+
+	// Diagnostic: calls the real API status endpoint so we can see
+	// connectivity + quota from inside the running container.
+	mux.HandleFunc("GET /api/apistatus", func(w http.ResponseWriter, r *http.Request) {
+		key := os.Getenv("API_FOOTBALL_KEY")
+		if key == "" {
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"error":"API_FOOTBALL_KEY not set"}`))
+			return
+		}
+		p := provider.NewAPIFootball(key)
+		result, err := p.Status(r.Context())
+		w.Header().Set("Content-Type", "application/json")
+		if err != nil {
+			_ = json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+			return
+		}
+		_ = json.NewEncoder(w).Encode(result)
 	})
 
 	api.Register(mux, api.Deps{Store: deps.Store, Hot: deps.Hot})
