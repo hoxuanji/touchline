@@ -42,7 +42,10 @@ export function useLiveStream(opts?: { makeES?: (url: string) => EventSourceLike
             old ? old.map((x) => (x.id === m.id ? m : x)) : old)
           qc.setQueryData<Match>(['match', m.id], m)
         }
-        // match.event is consumed by the Match Center slice (appends to ['events', id])
+        if (msg.type === 'match.event') {
+          const ev = msg.data as { matchId: number }
+          qc.setQueryData<unknown[]>(['events', ev.matchId], (old) => (old ? [...old, msg.data] : [msg.data]))
+        }
       }
     }
     connect()
