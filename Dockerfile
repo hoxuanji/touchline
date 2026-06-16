@@ -11,7 +11,7 @@ RUN npm run build
 # 2) Build the static Go binary with the freshly built SPA embedded.
 FROM golang:1.26-alpine AS build
 WORKDIR /app
-COPY go.mod ./
+COPY go.mod go.sum ./
 RUN go mod download
 COPY . .
 # Must come after COPY . . so the freshly-built SPA wins over any dist remnants in the context.
