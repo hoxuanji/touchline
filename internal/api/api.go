@@ -40,6 +40,10 @@ func Register(mux *http.ServeMux, deps Deps) {
 		}
 		writeJSON(w, http.StatusOK, venues)
 	})
+	RegisterMatches(mux, deps)
+	RegisterUserdata(mux, deps)
+	RegisterStats(mux, deps)
+	RegisterNotes(mux, deps)
 }
 
 func writeJSON(w http.ResponseWriter, status int, v any) {

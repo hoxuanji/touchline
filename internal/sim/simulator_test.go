@@ -73,3 +73,26 @@ func TestStepIgnoresNonLiveMatches(t *testing.T) {
 		t.Fatalf("scheduled match should not broadcast; got %d msgs", len(cap.msgs))
 	}
 }
+
+func TestStepRecomputesStandingsWhenMatchFinishes(t *testing.T) {
+	s, _, cap, _ := newSim(t)
+	for i := 0; i < 1000 && func() bool {
+		for _, m := range cap.msgs {
+			if m.Type == "standings.update" {
+				return false
+			}
+		}
+		return true
+	}(); i++ {
+		s.Step()
+	}
+	var saw bool
+	for _, m := range cap.msgs {
+		if m.Type == "standings.update" {
+			saw = true
+		}
+	}
+	if !saw {
+		t.Fatal("expected a standings.update broadcast after a match finished")
+	}
+}

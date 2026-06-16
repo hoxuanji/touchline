@@ -59,6 +59,14 @@ func (s *Simulator) Step() {
 		s.hot.PatchMatch(m)
 		_ = s.store.UpsertMatches([]model.Match{m})
 		s.bc.Broadcast(sse.Message{Type: "match.update", Data: m})
+		if m.Status == "finished" {
+			if err := s.store.RecomputeStandings(); err == nil {
+				if rows, err := s.store.Standings(); err == nil {
+					s.hot.SetStandings(rows)
+					s.bc.Broadcast(sse.Message{Type: "standings.update", Data: rows})
+				}
+			}
+		}
 	}
 }
 
