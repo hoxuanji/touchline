@@ -1,5 +1,4 @@
 import { useQuery } from '@tanstack/react-query'
-import type { Standing } from '../../lib/types'
 import { getStandings } from './api'
 
 export default function StandingsPage() {
