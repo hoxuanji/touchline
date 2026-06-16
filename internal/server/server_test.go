@@ -6,26 +6,48 @@ import (
 	"strings"
 	"testing"
 
+	"touchline/internal/hot"
+	"touchline/internal/model"
 	"touchline/internal/server"
+	"touchline/internal/sse"
+	"touchline/internal/store"
 )
 
-func TestHealthz(t *testing.T) {
-	h, err := server.Handler()
+func newHandler(t *testing.T) http.Handler {
+	t.Helper()
+	s, err := store.Open(":memory:")
 	if err != nil {
-		t.Fatalf("Handler() error: %v", err)
+		t.Fatal(err)
 	}
+	t.Cleanup(func() { s.Close() })
+	_ = s.UpsertMatches([]model.Match{{ID: 1, Stage: "group", Group: "A", Status: "scheduled"}})
+	h := hot.New()
+	matches, _ := s.Matches()
+	h.Hydrate(matches, nil)
+	handler, err := server.Handler(server.Deps{Store: s, Hot: h, SSE: sse.NewHub()})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return handler
+}
 
-	req := httptest.NewRequest(http.MethodGet, "/healthz", nil)
+func TestHealthz(t *testing.T) {
+	h := newHandler(t)
 	rec := httptest.NewRecorder()
-	h.ServeHTTP(rec, req)
+	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/healthz", nil))
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"status":"ok"`) {
+		t.Fatalf("healthz: code=%d body=%s", rec.Code, rec.Body.String())
+	}
+}
 
+func TestFixturesRouteWired(t *testing.T) {
+	h := newHandler(t)
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/fixtures", nil))
 	if rec.Code != http.StatusOK {
-		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+		t.Fatalf("fixtures route status = %d", rec.Code)
 	}
-	if ct := rec.Header().Get("Content-Type"); ct != "application/json" {
-		t.Errorf("Content-Type = %q, want application/json", ct)
-	}
-	if body := rec.Body.String(); !strings.Contains(body, `"status":"ok"`) {
-		t.Errorf("body = %q, want it to contain %q", body, `"status":"ok"`)
+	if !strings.Contains(rec.Body.String(), `"id":1`) {
+		t.Fatalf("fixtures body = %s", rec.Body.String())
 	}
 }
