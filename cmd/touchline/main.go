@@ -7,8 +7,10 @@ import (
 	"math/rand"
 	"net/http"
 	"os"
+	"strconv"
 	"time"
 
+	"touchline/internal/budget"
 	"touchline/internal/hot"
 	"touchline/internal/provider"
 	"touchline/internal/server"
@@ -61,6 +63,29 @@ func main() {
 		log.Printf("sim mode: promoted %d matches to live", promoted)
 		simulator := sim.New(st, hotStore, hub, rand.New(rand.NewSource(time.Now().UnixNano())), time.Now)
 		go simulator.Run(context.Background(), 5*time.Second)
+	} else if liveSource == "real" {
+		key := os.Getenv("API_FOOTBALL_KEY")
+		if key == "" {
+			log.Print("LIVE_SOURCE=real but API_FOOTBALL_KEY is empty; serving snapshot only")
+		} else {
+			dailyLimit, _ := strconv.Atoi(os.Getenv("DAILY_REQUEST_BUDGET"))
+			if dailyLimit <= 0 {
+				dailyLimit = 50
+			}
+			b := budget.New(dailyLimit, time.Now)
+			realProvider := provider.NewAPIFootball(key)
+			log.Printf("LIVE_SOURCE=real: APIFootball provider active, budget %d req/day (remaining: %d)",
+				dailyLimit, b.Remaining())
+			// reference-data refresh under budget (runs once at boot):
+			if b.Allow() {
+				if teams, err := realProvider.Teams(context.Background()); err == nil {
+					_ = st.UpsertTeams(teams)
+					log.Printf("refreshed %d teams from APIFootball", len(teams))
+				} else {
+					log.Printf("team refresh failed (snapshot remains): %v", err)
+				}
+			}
+		}
 	}
 
 	h, err := server.Handler(server.Deps{Store: st, Hot: hotStore, SSE: hub})
