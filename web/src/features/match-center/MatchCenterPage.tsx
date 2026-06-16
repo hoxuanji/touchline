@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { api } from '../../lib/api'
 import { useTeams } from '../../lib/useTeams'
 import { flag } from '../../lib/flags'
+import { useNav } from '../../app/nav'
 import type { Match } from '../../lib/types'
 
 const LIVE = new Set(['live', 'ht'])
@@ -19,6 +20,7 @@ function fmtDate(iso: string) {
 export default function MatchCenterPage() {
   const { data: matches = [], isLoading } = useQuery({ queryKey: ['fixtures'], queryFn: api.fixtures })
   const teams = useTeams()
+  const { go } = useNav()
 
   if (isLoading) return <p className="empty">Loading matches…</p>
 
@@ -37,7 +39,7 @@ export default function MatchCenterPage() {
           ? <p className="empty">No matches live right now.</p>
           : (
             <div className="mc__grid">
-              {live.map((m) => <ScoreCard key={m.id} m={m} teams={teams} />)}
+              {live.map((m) => <ScoreCard key={m.id} m={m} teams={teams} onClick={() => go({ page: 'match', id: m.id })} />)}
             </div>
           )
         }
@@ -51,7 +53,7 @@ export default function MatchCenterPage() {
             const home = teams.get(m.homeId)
             const away = teams.get(m.awayId)
             return (
-              <div key={m.id} className="mc__upcoming-row">
+              <div key={m.id} className="mc__upcoming-row" style={{ cursor: 'pointer' }} onClick={() => go({ page: 'match', id: m.id })}>
                 <span className="mc__upcoming-time">{fmt(m.kickoffUtc)}</span>
                 <span className="mc__upcoming-team">
                   <span className="mc__upcoming-flag">{flag(home?.country ?? '')}</span>
@@ -72,12 +74,12 @@ export default function MatchCenterPage() {
   )
 }
 
-function ScoreCard({ m, teams }: { m: Match; teams: Map<number, { name: string; country: string }> }) {
+function ScoreCard({ m, teams, onClick }: { m: Match; teams: Map<number, { name: string; country: string }>; onClick: () => void }) {
   const home = teams.get(m.homeId)
   const away = teams.get(m.awayId)
   const cls = m.status === 'finished' ? 'mc__card is-finished' : m.status === 'live' || m.status === 'ht' ? 'mc__card is-live' : 'mc__card'
   return (
-    <div className={cls}>
+    <div className={cls} style={{ cursor: 'pointer' }} onClick={onClick}>
       <div className="mc__card-info">
         <span>{m.group ? `Group ${m.group}` : m.stage?.toUpperCase()}</span>
         {(m.status === 'live') && <span className="mc__card-minute">{m.minute}&apos;</span>}

@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { api } from '../../lib/api'
 import { flag } from '../../lib/flags'
+import { useNav } from '../../app/nav'
 import type { Team, Venue } from '../../lib/types'
 
 const VENUE_COUNTRY_FLAG: Record<string, string> = {
@@ -12,6 +13,7 @@ export default function ExplorePage() {
   const { data: teams = [] } = useQuery<Team[]>({ queryKey: ['teams'], queryFn: api.teams })
   const { data: venues = [] } = useQuery<Venue[]>({ queryKey: ['venues'], queryFn: api.venues })
   const [selectedGroup, setSelectedGroup] = useState<string>('All')
+  const { go } = useNav()
 
   const groups = ['All', ...['A','B','C','D','E','F','G','H','I','J','K','L']]
   const filtered = selectedGroup === 'All' ? teams : teams.filter((t) => t.group === selectedGroup)
@@ -45,7 +47,9 @@ export default function ExplorePage() {
         </div>
         <div className="explore__cards">
           {filtered.map((t: Team) => (
-            <div key={t.id} className="explore__team-card" role="button" tabIndex={0}>
+            <div key={t.id} className="explore__team-card" role="button" tabIndex={0}
+              onClick={() => go({ page: 'team', id: t.id })}
+              onKeyDown={e => e.key === 'Enter' && go({ page: 'team', id: t.id })}>
               <span className="explore__team-flag">{flag(t.country)}</span>
               <span className="explore__team-name">{t.name}</span>
               <span className="explore__team-group">Group {t.group}</span>
@@ -59,7 +63,9 @@ export default function ExplorePage() {
         <p className="section-title">Venues &amp; Stadiums</p>
         <div className="explore__venue-cards">
           {venues.map((v: Venue) => (
-            <div key={v.id} className="explore__venue-card" role="button" tabIndex={0}>
+            <div key={v.id} className="explore__venue-card" role="button" tabIndex={0}
+              onClick={() => go({ page: 'venue', id: v.id })}
+              onKeyDown={e => e.key === 'Enter' && go({ page: 'venue', id: v.id })}>
               <div className="explore__venue-name">{v.name}</div>
               <div className="explore__venue-meta">
                 <span className="explore__venue-country">{VENUE_COUNTRY_FLAG[v.country] ?? '🏟️'}</span>
