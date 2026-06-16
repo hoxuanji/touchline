@@ -5,6 +5,7 @@ web/dist/*
 !web/dist/.gitkeep
 *.db
 *.db-*
-touchline
+/touchline
+cmd/touchline/touchline
 .env
 .DS_Store
