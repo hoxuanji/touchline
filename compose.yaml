@@ -3,9 +3,15 @@ services:
     build: .
     ports:
       - "${PORT:-8080}:8080"
+    env_file:
+      - path: .env
+        required: false
     environment:
       - PORT=8080
       - DB_PATH=/data/touchline.db
+      - LIVE_SOURCE=${LIVE_SOURCE:-real}
+      - API_FOOTBALL_KEY=${API_FOOTBALL_KEY}
+      - DAILY_REQUEST_BUDGET=${DAILY_REQUEST_BUDGET:-80}
     volumes:
       - touchline-data:/data
 
