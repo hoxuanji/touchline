@@ -18,8 +18,8 @@ COPY . .
 COPY --from=web /app/web/dist ./web/dist
 RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o /touchline ./cmd/touchline
 
-# 3) Ship just the binary.
-FROM scratch
+# 3) Ship the binary with CA certs (needed for TLS to api-sports.io).
+FROM gcr.io/distroless/static:nonroot
 COPY --from=build /touchline /touchline
 ENV PORT=8080
 EXPOSE 8080
