@@ -24,7 +24,7 @@ func newHandler(t *testing.T) http.Handler {
 	h := hot.New()
 	matches, _ := s.Matches()
 	h.Hydrate(matches, nil)
-	handler, err := server.Handler(server.Deps{Store: s, Hot: h, SSE: sse.NewHub()})
+	handler, err := server.Handler(server.Deps{Store: s, Hot: h, SSE: sse.NewHub(), Source: "sim"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -49,5 +49,14 @@ func TestFixturesRouteWired(t *testing.T) {
 	}
 	if !strings.Contains(rec.Body.String(), `"id":1`) {
 		t.Fatalf("fixtures body = %s", rec.Body.String())
+	}
+}
+
+func TestMetaRoute(t *testing.T) {
+	h := newHandler(t)
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/meta", nil))
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"source":"sim"`) {
+		t.Fatalf("meta: code=%d body=%s", rec.Code, rec.Body.String())
 	}
 }

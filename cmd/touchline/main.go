@@ -88,7 +88,7 @@ func main() {
 		}
 	}
 
-	h, err := server.Handler(server.Deps{Store: st, Hot: hotStore, SSE: hub})
+	h, err := server.Handler(server.Deps{Store: st, Hot: hotStore, SSE: hub, Source: liveSource})
 	if err != nil {
 		log.Fatalf("build handler: %v", err)
 	}

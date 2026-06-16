@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { ComponentType } from 'react'
 import { useLiveStream } from '../lib/useLiveStream'
+import { useMeta } from '../features/meta/useMeta'
 import MatchCenterPage from '../features/match-center/MatchCenterPage'
 import SchedulePage from '../features/schedule/SchedulePage'
 import StandingsPage from '../features/standings/StandingsPage'
@@ -19,6 +20,7 @@ const PAGES: Record<View, ComponentType> = {
 export default function Shell() {
   const [view, setView] = useState<View>('Match Center')
   const { connected } = useLiveStream()
+  const { data: meta } = useMeta()
   const Page = PAGES[view]
   return (
     <main className="shell">
@@ -32,6 +34,7 @@ export default function Shell() {
           ))}
         </nav>
         <span className={`shell__live ${connected ? 'is-on' : ''}`} title={connected ? 'live' : 'offline'}>●</span>
+        {meta?.source && <span className="shell__source">{meta.source.toUpperCase()}</span>}
       </header>
       <section className="shell__body shell__body--page">
         <Page />

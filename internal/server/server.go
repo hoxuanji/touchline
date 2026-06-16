@@ -13,9 +13,10 @@ import (
 
 // Deps are the runtime dependencies the handler needs.
 type Deps struct {
-	Store *store.Store
-	Hot   *hot.Store
-	SSE   *sse.Hub
+	Store  *store.Store
+	Hot    *hot.Store
+	SSE    *sse.Hub
+	Source string // "sim" | "real"
 }
 
 // Handler builds the application's HTTP handler: health, REST API, SSE stream,
@@ -26,6 +27,15 @@ func Handler(deps Deps) (http.Handler, error) {
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`{"status":"ok"}`))
+	})
+
+	source := deps.Source
+	if source == "" {
+		source = "sim"
+	}
+	mux.HandleFunc("GET /api/meta", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"source":"` + source + `"}`))
 	})
 
 	api.Register(mux, api.Deps{Store: deps.Store, Hot: deps.Hot})
