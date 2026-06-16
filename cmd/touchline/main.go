@@ -4,12 +4,15 @@ package main
 import (
 	"context"
 	"log"
+	"math/rand"
 	"net/http"
 	"os"
+	"time"
 
 	"touchline/internal/hot"
 	"touchline/internal/provider"
 	"touchline/internal/server"
+	"touchline/internal/sim"
 	"touchline/internal/sse"
 	"touchline/internal/store"
 )
@@ -46,6 +49,19 @@ func main() {
 	hotStore.Hydrate(matches, standings)
 
 	hub := sse.NewHub()
+
+	// Live source. LIVE_SOURCE=sim (default) runs the built-in simulator;
+	// "real" polling is added in Phase 3 with no change to the rest.
+	liveSource := os.Getenv("LIVE_SOURCE")
+	if liveSource == "" {
+		liveSource = "sim"
+	}
+	if liveSource == "sim" {
+		promoted := sim.PromoteLive(st, hotStore, 4)
+		log.Printf("sim mode: promoted %d matches to live", promoted)
+		simulator := sim.New(st, hotStore, hub, rand.New(rand.NewSource(time.Now().UnixNano())), time.Now)
+		go simulator.Run(context.Background(), 5*time.Second)
+	}
 
 	h, err := server.Handler(server.Deps{Store: st, Hot: hotStore, SSE: hub})
 	if err != nil {
