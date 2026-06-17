@@ -126,6 +126,43 @@ func main() {
 				}
 			}
 		}
+	} else if liveSource == "footballdata" {
+		// football-data.org: free tier, no credit card, WC2026 included.
+		// Register at football-data.org to get a token, set FOOTBALL_DATA_TOKEN in .env.
+		token := os.Getenv("FOOTBALL_DATA_TOKEN")
+		if token == "" {
+			log.Print("LIVE_SOURCE=footballdata but FOOTBALL_DATA_TOKEN is empty; serving snapshot only")
+		} else {
+			fdProvider := provider.NewFootballData(token)
+			ctx := context.Background()
+			log.Print("football-data.org: refreshing WC2026 data…")
+
+			if teams, err := fdProvider.Teams(ctx); err != nil {
+				log.Printf("teams FAILED: %v", err)
+			} else if len(teams) > 0 {
+				_ = st.UpsertTeams(teams)
+				log.Printf("refreshed %d teams", len(teams))
+			}
+
+			if fixtures, err := fdProvider.Fixtures(ctx); err != nil {
+				log.Printf("fixtures FAILED: %v", err)
+			} else if len(fixtures) > 0 {
+				_ = st.UpsertMatches(fixtures)
+				if m, err2 := st.Matches(); err2 == nil {
+					sd, _ := st.Standings()
+					hotStore.Hydrate(m, sd)
+				}
+				log.Printf("refreshed %d fixtures", len(fixtures))
+			}
+
+			if sd, err := fdProvider.Standings(ctx); err != nil {
+				log.Printf("standings FAILED: %v", err)
+			} else if len(sd) > 0 {
+				_ = st.UpsertStandings(sd)
+				hotStore.SetStandings(sd)
+				log.Printf("refreshed %d standing rows", len(sd))
+			}
+		}
 	}
 
 	h, err := server.Handler(server.Deps{Store: st, Hot: hotStore, SSE: hub, Source: liveSource})
